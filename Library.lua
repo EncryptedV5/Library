@@ -1,4 +1,3 @@
-
 local Library = {}
 Library.__index = Library
 
@@ -51,6 +50,17 @@ function Library:AddWindow(name)
     FeaturesHolder.BorderSizePixel = 0
     FeaturesHolder.Parent = Main
 
+    local Window = {
+        Main = Main,
+        Topbar = Topbar,
+        TabHolder = TabHolder,
+        FeaturesHolder = FeaturesHolder,
+        ScreenGui = ScreenGui,
+        Name = name
+    }
+
+    setmetatable(Window, Library)
+
     local SelectedTabLabel = Instance.new("TextLabel")
     SelectedTabLabel.Name = "SelectTabNameLabel"
     SelectedTabLabel.Size = UDim2.new(0, 200, 1, 0)
@@ -63,17 +73,6 @@ function Library:AddWindow(name)
     SelectedTabLabel.Text = "Select a Tab"
     SelectedTabLabel.Parent = Topbar
 
-    local Window = {
-        Main = Main,
-        Topbar = Topbar,
-        TabHolder = TabHolder,
-        FeaturesHolder = FeaturesHolder,
-        ScreenGui = ScreenGui,
-        Name = name,
-        _tabs = {}
-    }
-
-    setmetatable(Window, self)
     return Window
 end
 
@@ -91,7 +90,6 @@ function Library:AddTab(tabName)
 
     local tabContent = Instance.new("ScrollingFrame")
     tabContent.Size = self.FeaturesHolder.Size
-    tabContent.Position = self.FeaturesHolder.Position
     tabContent.BackgroundTransparency = 1
     tabContent.BorderSizePixel = 0
     tabContent.ScrollBarThickness = 0
@@ -107,6 +105,10 @@ function Library:AddTab(tabName)
     padding.PaddingLeft = UDim.new(0, 4)
     padding.Parent = tabContent
 
+    if not self._tabs then
+        self._tabs = {}
+    end
+
     self._tabs[tab] = tabContent
 
     tab.MouseButton1Click:Connect(function()
@@ -115,22 +117,27 @@ function Library:AddTab(tabName)
             otherTab.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             content.Visible = false
         end
+
         tab.BackgroundTransparency = 0
         tab.BackgroundColor3 = Color3.fromRGB(66, 66, 66)
         tabContent.Visible = true
         self.FeaturesHolder.Visible = true
+
         local label = self.Topbar:FindFirstChild("SelectTabNameLabel")
-        if label then label.Text = tabName end
+        if label then
+            label.Text = tabName
+        end
     end)
 
-    local TabObject = { Content = tabContent }
+    local TabObject = {}
+    TabObject.Content = tabContent
 
-    function TabObject:AddLabel(cfg)
+    function TabObject:AddLabel(labelConfig)
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(0, 314, 0, 30)
         label.BackgroundTransparency = 1
         label.Font = Enum.Font.SourceSans
-        label.Text = cfg.Name or "Label"
+        label.Text = labelConfig.Name or "Label"
         label.TextColor3 = Color3.fromRGB(212, 212, 212)
         label.TextSize = 20
         label.TextXAlignment = Enum.TextXAlignment.Left
@@ -138,47 +145,55 @@ function Library:AddTab(tabName)
         return label
     end
 
-    function TabObject:AddTextbox(cfg)
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 314, 0, 35)
-        frame.BackgroundTransparency = 1
-        frame.Parent = tabContent
+    function TabObject:AddTextbox(config)
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(0, 314, 0, 35)
+        container.BackgroundTransparency = 1
+        container.Parent = tabContent
+
         local box = Instance.new("TextBox")
         box.Size = UDim2.new(1, 0, 1, 0)
         box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         box.BorderSizePixel = 0
-        box.Text = cfg.Default or ""
+        box.Text = config.Default or ""
         box.Font = Enum.Font.SourceSans
         box.TextColor3 = Color3.fromRGB(212, 212, 212)
         box.TextSize = 20
         box.TextXAlignment = Enum.TextXAlignment.Left
         box.ClearTextOnFocus = false
-        box.Parent = frame
+        box.Parent = container
+
         box.FocusLost:Connect(function(enterPressed)
             if enterPressed then
                 local value = box.Text
-                if cfg.TextDisappear then box.Text = "" end
-                if cfg.Callback then pcall(cfg.Callback, value) end
+                if config.TextDisappear then
+                    box.Text = ""
+                end
+                if config.Callback then
+                    pcall(config.Callback, value)
+                end
             end
         end)
         return box
     end
 
-    function TabObject:AddToggle(cfg)
-        local state = cfg.Default or false
+    function TabObject:AddToggle(config)
+        local state = config.Default or false
         local container = Instance.new("Frame")
         container.Size = UDim2.new(0, 314, 0, 35)
         container.BackgroundTransparency = 1
         container.Parent = tabContent
+
         local text = Instance.new("TextLabel")
         text.Size = UDim2.new(1, -35, 1, 0)
         text.BackgroundTransparency = 1
-        text.Text = cfg.Name or "Toggle"
+        text.Text = config.Name or "Toggle"
         text.Font = Enum.Font.SourceSans
         text.TextColor3 = Color3.fromRGB(212, 212, 212)
         text.TextSize = 20
         text.TextXAlignment = Enum.TextXAlignment.Left
         text.Parent = container
+
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(0, 30, 0, 30)
         button.Position = UDim2.new(1, -30, 0.5, -15)
@@ -186,87 +201,101 @@ function Library:AddTab(tabName)
         button.Text = ""
         button.BorderSizePixel = 0
         button.Parent = container
+
         button.MouseButton1Click:Connect(function()
             state = not state
             button.BackgroundColor3 = state and Color3.fromRGB(80, 80, 80) or Color3.fromRGB(40, 40, 40)
-            if cfg.Callback then pcall(cfg.Callback, state) end
+            if config.Callback then
+                pcall(config.Callback, state)
+            end
         end)
         return button
     end
 
-    function TabObject:AddButton(cfg)
+    function TabObject:AddButton(config)
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(0, 314, 0, 35)
         button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        button.Text = cfg.Name or "Button"
+        button.Text = config.Name or "Button"
         button.Font = Enum.Font.SourceSans
         button.TextColor3 = Color3.fromRGB(212, 212, 212)
         button.TextSize = 20
         button.BorderSizePixel = 0
         button.Parent = tabContent
+
         button.MouseButton1Click:Connect(function()
-            if cfg.Callback then pcall(cfg.Callback) end
+            if config.Callback then
+                pcall(config.Callback)
+            end
         end)
         return button
     end
 
-    function TabObject:AddDropdown(cfg)
+    function TabObject:AddDropdown(config)
         local dropdownFrame = Instance.new("Frame")
         dropdownFrame.Size = UDim2.new(0, 314, 0, 35)
         dropdownFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         dropdownFrame.BorderSizePixel = 0
         dropdownFrame.Parent = tabContent
-        local selected = Instance.new("TextButton")
-        selected.Size = UDim2.new(1, 0, 1, 0)
-        selected.BackgroundTransparency = 1
-        selected.Text = cfg.Default or ""
-        selected.Font = Enum.Font.SourceSans
-        selected.TextSize = 20
-        selected.TextColor3 = Color3.fromRGB(212, 212, 212)
-        selected.TextXAlignment = Enum.TextXAlignment.Left
-        selected.Parent = dropdownFrame
+
+        local selectedValue = Instance.new("TextButton")
+        selectedValue.Size = UDim2.new(1, 0, 1, 0)
+        selectedValue.BackgroundTransparency = 1
+        selectedValue.Text = config.Default or ""
+        selectedValue.Font = Enum.Font.SourceSans
+        selectedValue.TextSize = 20
+        selectedValue.TextColor3 = Color3.fromRGB(212, 212, 212)
+        selectedValue.TextXAlignment = Enum.TextXAlignment.Left
+        selectedValue.Parent = dropdownFrame
+
         local caret = Instance.new("ImageLabel")
         caret.Size = UDim2.new(0, 20, 0, 20)
         caret.Position = UDim2.new(1, -25, 0.5, -10)
         caret.BackgroundTransparency = 1
         caret.Image = "rbxassetid://132286269376660"
-        caret.Rotation = 0
         caret.Parent = dropdownFrame
-        local holder = Instance.new("Frame")
-        holder.Position = UDim2.new(0, 0, 1, 0)
-        holder.Size = UDim2.new(1, 0, 0, 0)
-        holder.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        holder.BorderSizePixel = 0
-        holder.Visible = false
-        holder.ClipsDescendants = true
-        holder.Parent = dropdownFrame
-        local layout = Instance.new("UIListLayout")
-        layout.Parent = holder
 
-        local function toggle()
-            local open = not holder.Visible
-            holder.Visible = open
+        local optionsHolder = Instance.new("Frame")
+        optionsHolder.Position = UDim2.new(0, 0, 1, 0)
+        optionsHolder.Size = UDim2.new(1, 0, 0, 0)
+        optionsHolder.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        optionsHolder.BorderSizePixel = 0
+        optionsHolder.Visible = false
+        optionsHolder.ClipsDescendants = true
+        optionsHolder.Parent = dropdownFrame
+
+        local layout = Instance.new("UIListLayout")
+        layout.Parent = optionsHolder
+
+        local function toggleDropdown()
+            local open = not optionsHolder.Visible
+            optionsHolder.Visible = open
             caret.Rotation = open and 90 or 0
-            holder.Size = open and UDim2.new(1, 0, 0, #cfg.Options * 30) or UDim2.new(1, 0, 0, 0)
+            optionsHolder.Size = open and UDim2.new(1, 0, 0, #config.Options * 30) or UDim2.new(1, 0, 0, 0)
         end
 
-        selected.MouseButton1Click:Connect(toggle)
+        selectedValue.MouseButton1Click:Connect(toggleDropdown)
 
-        for _, opt in ipairs(cfg.Options or {}) do
-            local b = Instance.new("TextButton")
-            b.Size = UDim2.new(1, 0, 0, 30)
-            b.BackgroundTransparency = 1
-            b.Text = opt
-            b.Font = Enum.Font.SourceSans
-            b.TextSize = 18
-            b.TextColor3 = Color3.fromRGB(212, 212, 212)
-            b.Parent = holder
-            b.MouseButton1Click:Connect(function()
-                selected.Text = opt
-                toggle()
-                if cfg.Callback then pcall(cfg.Callback, opt) end
+        for _, option in ipairs(config.Options or {}) do
+            local optionButton = Instance.new("TextButton")
+            optionButton.Size = UDim2.new(1, 0, 0, 30)
+            optionButton.BackgroundTransparency = 1
+            optionButton.Text = option
+            optionButton.Font = Enum.Font.SourceSans
+            optionButton.TextSize = 18
+            optionButton.TextColor3 = Color3.fromRGB(212, 212, 212)
+            optionButton.Parent = optionsHolder
+
+            optionButton.MouseButton1Click:Connect(function()
+                selectedValue.Text = option
+                toggleDropdown()
+                if config.Callback then
+                    pcall(config.Callback, option)
+                end
             end)
         end
+
+        return dropdownFrame
     end
 
     return TabObject
